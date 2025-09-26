@@ -357,7 +357,7 @@ int stmmac_mdio_reset(struct mii_bus *bus)
 
 		reset_gpio = devm_gpiod_get_optional(priv->device,
 						     "snps,reset",
-						     GPIOD_OUT_LOW);
+						     GPIOD_OUT_LOW | GPIOD_FLAGS_BIT_NONEXCLUSIVE);
 		if (IS_ERR(reset_gpio))
 			return PTR_ERR(reset_gpio);
 
@@ -471,10 +471,17 @@ int stmmac_mdio_register(struct net_device *ndev)
 		new_bus->read = &stmmac_mdio_read;
 		new_bus->write = &stmmac_mdio_write;
 		max_addr = PHY_MAX_ADDR;
+
+		if (priv->plat->mdio_read)
+			new_bus->read = priv->plat->mdio_read;
+		if (priv->plat->mdio_write)
+			new_bus->write = priv->plat->mdio_write;
 	}
 
 	if (mdio_bus_data->needs_reset)
 		new_bus->reset = &stmmac_mdio_reset;
+	if (priv->plat->mdio_reset)
+		new_bus->reset = priv->plat->mdio_reset;
 
 	snprintf(new_bus->id, MII_BUS_ID_SIZE, "%s-%x",
 		 new_bus->name, priv->plat->bus_id);

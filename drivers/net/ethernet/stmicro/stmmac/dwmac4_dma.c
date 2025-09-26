@@ -359,6 +359,11 @@ static int dwmac4_get_hw_feature(void __iomem *ioaddr,
 	dma_cap->vlhash = (hw_cap & GMAC_HW_FEAT_VLHASH) >> 4;
 	dma_cap->multi_addr = (hw_cap & GMAC_HW_FEAT_ADDMAC) >> 18;
 	dma_cap->pcs = (hw_cap & GMAC_HW_FEAT_PCSSEL) >> 3;
+#if defined(CONFIG_ARCH_AMBARELLA)
+	/* There's no PCS for RGMII mode */
+	if (((hw_cap >> 28) & 0xf) == 0x1)
+		dma_cap->pcs = 0;
+#endif
 	dma_cap->sma_mdio = (hw_cap & GMAC_HW_FEAT_SMASEL) >> 5;
 	dma_cap->pmt_remote_wake_up = (hw_cap & GMAC_HW_FEAT_RWKSEL) >> 6;
 	dma_cap->pmt_magic_frame = (hw_cap & GMAC_HW_FEAT_MGKSEL) >> 7;

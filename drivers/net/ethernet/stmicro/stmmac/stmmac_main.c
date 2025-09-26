@@ -1078,7 +1078,8 @@ static void stmmac_mac_link_up(struct phylink_config *config,
 
 	stmmac_mac_set(priv, priv->ioaddr, true);
 	if (phy && priv->dma_cap.eee) {
-		priv->eee_active = phy_init_eee(phy, 0) >= 0;
+		priv->eee_active =
+			phy_init_eee(phy, !priv->plat->rx_clk_runs_in_lpi) >= 0;
 		priv->eee_enabled = stmmac_eee_init(priv);
 		priv->tx_lpi_enabled = priv->eee_enabled;
 		stmmac_set_eee_pls(priv, priv->hw, true);
@@ -1118,6 +1119,13 @@ static void stmmac_check_pcs_mode(struct stmmac_priv *priv)
 			netdev_dbg(priv->dev, "PCS SGMII support enabled\n");
 			priv->hw->pcs = STMMAC_PCS_SGMII;
 		}
+#if defined(CONFIG_ARCH_AMBARELLA)
+		/* overclocked SGMII mode */
+		else if (interface == PHY_INTERFACE_MODE_2500BASEX) {
+			netdev_dbg(priv->dev, "PCS HiSGMII support enabled\n");
+			priv->hw->pcs = STMMAC_PCS_SGMII;
+		}
+#endif
 	}
 }
 
@@ -1190,6 +1198,9 @@ static int stmmac_phy_setup(struct stmmac_priv *priv)
 	int max_speed = priv->plat->max_speed;
 	int mode = priv->plat->phy_interface;
 	struct phylink *phylink;
+
+	if (priv->plat->has_ambarella)
+		priv->phylink_config.mac_managed_pm = true;
 
 	priv->phylink_config.dev = &priv->dev->dev;
 	priv->phylink_config.type = PHYLINK_NETDEV;
@@ -3312,13 +3323,23 @@ static int stmmac_hw_setup(struct net_device *dev, bool ptp_register)
 	if (priv->hw->pcs) {
 		int speed = priv->plat->mac_port_sel_speed;
 
+#if defined(CONFIG_ARCH_AMBARELLA)
 		if ((speed == SPEED_10) || (speed == SPEED_100) ||
-		    (speed == SPEED_1000)) {
+			(speed == SPEED_1000) || (speed == SPEED_2500)) {
 			priv->hw->ps = speed;
 		} else {
 			dev_warn(priv->device, "invalid port speed\n");
 			priv->hw->ps = 0;
 		}
+#else
+		if ((speed == SPEED_10) || (speed == SPEED_100) ||
+			(speed == SPEED_1000)) {
+			priv->hw->ps = speed;
+		} else {
+			dev_warn(priv->device, "invalid port speed\n");
+			priv->hw->ps = 0;
+		}
+#endif
 	}
 
 	/* Initialize the MAC Core */
@@ -3379,8 +3400,27 @@ static int stmmac_hw_setup(struct net_device *dev, bool ptp_register)
 		}
 	}
 
-	if (priv->hw->pcs)
+	if (priv->hw->pcs) {
+#if defined(CONFIG_ARCH_AMBARELLA)
+		switch (priv->plat->macpcs_negoctrl) {
+			case 0:
+				stmmac_pcs_ctrl_ane(priv, priv->ioaddr, 0, 0, 0);
+				break;
+			case 1:
+				stmmac_pcs_ctrl_ane(priv, priv->ioaddr, 1, 0, 0);
+				break;
+			case 2:
+				stmmac_pcs_ctrl_ane(priv, priv->ioaddr, 0, 1, 0);
+				break;
+			case 3:
+			default:
+				stmmac_pcs_ctrl_ane(priv, priv->ioaddr, 1, 1, 0);
+				break;
+		}
+#else
 		stmmac_pcs_ctrl_ane(priv, priv->ioaddr, 1, priv->hw->ps, 0);
+#endif
+	}
 
 	/* set TX and RX rings length */
 	stmmac_set_rings_length(priv);
@@ -3664,6 +3704,7 @@ static int stmmac_request_irq_single(struct net_device *dev)
 	/* Request the Wake IRQ in case of another line
 	 * is used for WoL
 	 */
+	priv->wol_irq_disabled = true;
 	if (priv->wol_irq > 0 && priv->wol_irq != dev->irq) {
 		ret = request_irq(priv->wol_irq, stmmac_interrupt,
 				  IRQF_SHARED, dev->name, dev);
@@ -4206,6 +4247,23 @@ static netdev_tx_t stmmac_tso_xmit(struct sk_buff *skb, struct net_device *dev)
 	}
 
 	stmmac_tso_allocator(priv, des, tmp_pay_len, (nfrags == 0), queue);
+
+	/* In case two or more DMA transmit descriptors are allocated for this
+	 * non-paged SKB data, the DMA buffer address should be saved to
+	 * tx_q->tx_skbuff_dma[].buf corresponding to the last descriptor,
+	 * and leave the other tx_q->tx_skbuff_dma[].buf as NULL to guarantee
+	 * that stmmac_tx_clean() does not unmap the entire DMA buffer too early
+	 * since the tail areas of the DMA buffer can be accessed by DMA engine
+	 * sooner or later.
+	 * By saving the DMA buffer address to tx_q->tx_skbuff_dma[].buf
+	 * corresponding to the last descriptor, stmmac_tx_clean() will unmap
+	 * this DMA buffer right after the DMA engine completely finishes the
+	 * full buffer transmission.
+	 */
+	tx_q->tx_skbuff_dma[tx_q->cur_tx].buf = des;
+	tx_q->tx_skbuff_dma[tx_q->cur_tx].len = skb_headlen(skb);
+	tx_q->tx_skbuff_dma[tx_q->cur_tx].map_as_page = false;
+	tx_q->tx_skbuff_dma[tx_q->cur_tx].buf_type = STMMAC_TXBUF_T_SKB;
 
 	/* Prepare fragments */
 	for (i = 0; i < nfrags; i++) {
@@ -5782,6 +5840,10 @@ static void stmmac_common_interrupt(struct stmmac_priv *priv)
 				netif_carrier_on(priv->dev);
 			else
 				netif_carrier_off(priv->dev);
+#if defined(CONFIG_ARCH_AMBARELLA)
+			if (!priv->xstats.pcs_link && priv->plat->serdes_bsp_fixup)
+				priv->plat->serdes_bsp_fixup(priv->plat->bsp_priv);
+#endif
 		}
 
 		stmmac_timestamp_interrupt(priv, priv);
@@ -6398,15 +6460,7 @@ static int stmmac_vlan_rx_kill_vid(struct net_device *ndev, __be16 proto, u16 vi
 	clear_bit(vid, priv->active_vlans);
 
 	if (priv->hw->num_vlan) {
-		if (priv->is_phy_started == false) {
-			stmmac_init_phy(ndev);
-			phylink_start(priv->phylink);
-			ret = stmmac_del_hw_vlan_rx_fltr(priv, ndev, priv->hw, proto, vid);
-			phylink_stop(priv->phylink);
-			phylink_disconnect_phy(priv->phylink);
-		} else {
-			ret = stmmac_del_hw_vlan_rx_fltr(priv, ndev, priv->hw, proto, vid);
-		}
+		ret = stmmac_del_hw_vlan_rx_fltr(priv, ndev, priv->hw, proto, vid);
 		if (ret)
 			goto del_vlan_error;
 	}
@@ -7587,6 +7641,8 @@ int stmmac_resume(struct device *dev)
 	}
 
 	rtnl_lock();
+	if (priv->plat->has_ambarella)
+		phy_init_hw(ndev->phydev);
 	if (device_may_wakeup(priv->device) && priv->plat->pmt) {
 		phylink_resume(priv->phylink);
 	} else {

@@ -71,6 +71,14 @@ static inline void dwmac_pcs_isr(void __iomem *ioaddr, u32 reg,
 			pr_info("stmmac_pcs: Link Up\n");
 		else
 			pr_info("stmmac_pcs: Link Down\n");
+
+#if defined(CONFIG_ARCH_AMBARELLA)
+		/* MAC_PHYIF.bit19 never set under the fixed-link mode */
+		if (val & GMAC_AN_STATUS_LS)
+			x->pcs_link = 1;
+		else
+			x->pcs_link = 0;
+#endif
 	}
 }
 
@@ -110,6 +118,8 @@ static inline void dwmac_ctrl_ane(void __iomem *ioaddr, u32 reg, bool ane,
 	/* Enable and restart the Auto-Negotiation */
 	if (ane)
 		value |= GMAC_AN_CTRL_ANE | GMAC_AN_CTRL_RAN;
+	else
+		value &= ~GMAC_AN_CTRL_ANE;
 
 	/* In case of MAC-2-MAC connection, block is configured to operate
 	 * according to MAC conf register.

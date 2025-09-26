@@ -567,6 +567,10 @@ stmmac_probe_config_dt(struct platform_device *pdev, u8 *mac)
 
 	of_property_read_u32(np, "snps,ps-speed", &plat->mac_port_sel_speed);
 
+#if defined(CONFIG_ARCH_AMBARELLA)
+	of_property_read_u32(np, "amb,macpcs-negoctrl", &plat->macpcs_negoctrl);
+#endif
+
 	plat->axi = stmmac_axi_setup(pdev);
 
 	rc = stmmac_mtl_setup(pdev, plat);
