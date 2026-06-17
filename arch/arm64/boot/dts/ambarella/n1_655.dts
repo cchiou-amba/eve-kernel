@@ -1,0 +1,39 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright (c) 2026
+ */
+
+/dts-v1/;
+
+#include "ambarella-n1_655.dtsi"
+
+/ {
+	compatible = "Ambarella N1-655";
+	model = "n1-655 cooper pro";
+
+	/delete-node/psci;
+
+	memory {
+		device_type = "memory";
+		reg = <0x00000000 0x00000000 0x00000001 0x00000000>;
+		#address-cells = <0x00000002>;
+		#size-cells = <0x00000002>;
+		ranges;
+	};
+
+	 firmware {
+		 /delete-node/optee;
+	 };
+};
+
+
+&sdmmc0 {
+	status = "okay";
+	non-removable;
+};
+
+&usb_cdnsp {
+	status = "okay";
+	hub-pwr-gpios = <&gpio 3 1>;
+	hub-rst-gpios = <&gpio 19 0>;
+};
