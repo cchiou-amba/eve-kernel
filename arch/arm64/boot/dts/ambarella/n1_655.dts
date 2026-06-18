@@ -37,3 +37,20 @@
 	hub-pwr-gpios = <&gpio 3 1>;
 	hub-rst-gpios = <&gpio 19 0>;
 };
+
+&mac0 {
+	status = "okay";
+	rst-gpios = <&gpio 14 1>;
+	rst-gpios-delay = <150 100>;
+	phy-handle = <&maca_phy0>;
+	phy-mode = "rgmii-rxid";
+	/delete-property/ amb,sgmii-regmap;
+	mdio {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		compatible = "snps,dwmac-mdio";
+		maca_phy0: ethernet-phy@0 {
+			reg = <2>;
+		};
+	};
+};
