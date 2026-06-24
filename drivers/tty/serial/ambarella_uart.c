@@ -1441,7 +1441,7 @@ static int serial_ambarella_probe(struct platform_device *pdev)
 	struct resource *mem;
 	struct pinctrl *pinctrl;
 	int irq, id, rval = 0;
-	printk("DEBUG: %s %u\n", __func__,__LINE__);
+
 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!mem) {
 		dev_err(&pdev->dev, "no mem resource!\n");

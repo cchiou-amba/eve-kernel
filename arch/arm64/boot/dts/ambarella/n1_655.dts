@@ -15,7 +15,7 @@
 
 	memory {
 		device_type = "memory";
-		reg = <0x00000000 0x00000000 0x00000001 0x00000000>;
+		reg = <0x00000000 0x00000000 0x00000008 0x00000000>;
 		#address-cells = <0x00000002>;
 		#size-cells = <0x00000002>;
 		ranges;
@@ -53,4 +53,8 @@
 			reg = <2>;
 		};
 	};
+};
+&udc0 {
+
+	status = "disabled";
 };
