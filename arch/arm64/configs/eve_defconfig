@@ -6576,6 +6576,13 @@ CONFIG_ZYNQMP_POWER=y
 CONFIG_ZYNQMP_PM_DOMAINS=y
 CONFIG_XLNX_EVENT_MANAGER=y
 # end of Xilinx SoC drivers
+
+#
+# Ambarella SoC drivers
+#
+CONFIG_AMBARELLA_SUPPORT_GDMA=y
+# CONFIG_AMBARELLA_LPDDR5_ADJUST is not set
+# end of Ambarella SoC drivers
 # end of SOC (System On Chip) specific Drivers
 
 CONFIG_PM_DEVFREQ=y
