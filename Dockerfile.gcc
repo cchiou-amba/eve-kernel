@@ -109,6 +109,10 @@ RUN --mount=type=cache,target=/root/.cache/ccache,id=kernel-ccache-${TARGETARCH}
         INSTALL_DTBS_PATH=/tmp/kernel-modules/boot/dtb dtbs_install && \
     ccache -s | tee -a /ccache-stats.txt
 
+WORKDIR /kernel-src/ambarella/cavalry/cavalry_v3
+RUN make O=/kernel-out LOCALVERSION="-${LOCALVERSION}" M=/kernel-src/ambarella/cavalry/cavalry_v3 -C /kernel-src -j$(nproc) AMBARELLA_DRV_CFLAGS="-I/kernel-src/ambarella/include/cavalry_v3 -DAMBA_AMYOC_BUILD -DAMBA_SOC_N1_655" && \
+	   make O=/kernel-out LOCALVERSION="-${LOCALVERSION}" M=/kernel-src/ambarella/cavalry/cavalry_v3 -C /kernel-src INSTALL_MOD_STRIP=1 INSTALL_MOD_PATH=/tmp/kernel-modules modules_install
+
 ADD https://github.com/openzfs/zfs.git#zfs-2.2.2 /tmp/zfs
 WORKDIR /tmp/zfs
 
