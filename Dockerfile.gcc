@@ -114,6 +114,12 @@ RUN make O=/kernel-out LOCALVERSION="-${LOCALVERSION}" M=/kernel-src/ambarella/c
 	   make O=/kernel-out LOCALVERSION="-${LOCALVERSION}" M=/kernel-src/ambarella/cavalry/cavalry_v3 -C /kernel-src INSTALL_MOD_STRIP=1 INSTALL_MOD_PATH=/tmp/kernel-modules modules_install && \
 	   mkdir -p /tmp/kernel-modules/lib/firmware && install -m 0644 /kernel-src/ambarella/firmware/cavalry_v3/n1_655/cavalry.bin /tmp/kernel-modules/lib/firmware/cavalry.bin
 
+# amba_virt: HVM <-> NOHYPER transport (virtio-vsock control, ivshmem bulk).
+# Staged into ambarella/amba_virt by amba-virt/scripts/install_kmod_to_eve_kernel.sh.
+WORKDIR /kernel-src/ambarella/amba_virt
+RUN make O=/kernel-out LOCALVERSION="-${LOCALVERSION}" M=/kernel-src/ambarella/amba_virt -C /kernel-src -j$(nproc) && \
+	   make O=/kernel-out LOCALVERSION="-${LOCALVERSION}" M=/kernel-src/ambarella/amba_virt -C /kernel-src INSTALL_MOD_STRIP=1 INSTALL_MOD_PATH=/tmp/kernel-modules modules_install
+
 ADD https://github.com/openzfs/zfs.git#zfs-2.2.2 /tmp/zfs
 WORKDIR /tmp/zfs
 
