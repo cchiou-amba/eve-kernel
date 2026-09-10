@@ -99,12 +99,6 @@ RUN ! grep -q -E 'CONFIG_BPF_KPROBE_OVERRIDE=[y|m]' .config || (echo "Cannot set
 
 RUN make -j$(nproc) mrproper
 RUN make O=/kernel-out ${KERNEL_CONFIG}
-RUN mkdir -p /kernel-out/certs && \
-    if [ -f /kernel-src/certs/dev_key.pem ]; then \
-        echo "Using persistent developer signing key..." && \
-        cp /kernel-src/certs/dev_key.pem /kernel-out/certs/dev_key.pem && \
-        sed -i 's|^CONFIG_MODULE_SIG_KEY=.*|CONFIG_MODULE_SIG_KEY="certs/dev_key.pem"|' /kernel-out/.config; \
-    fi
 RUN --mount=type=cache,target=/root/.cache/ccache,id=kernel-ccache-${TARGETARCH} \
     ccache -z \
     && echo "Building kernel for ${TARGETARCH} with ARCH=${ARCH} and CROSS_COMPILE=${CROSS_COMPILE}" \
@@ -114,6 +108,7 @@ RUN --mount=type=cache,target=/root/.cache/ccache,id=kernel-ccache-${TARGETARCH}
     && make CC="${CROSS_COMPILE}gcc" O=/kernel-out -j$(nproc) \
         INSTALL_DTBS_PATH=/tmp/kernel-modules/boot/dtb dtbs_install && \
     ccache -s | tee -a /ccache-stats.txt
+
 
 ADD https://github.com/openzfs/zfs.git#zfs-2.2.2 /tmp/zfs
 WORKDIR /tmp/zfs
@@ -133,6 +128,35 @@ RUN --mount=type=cache,target=/root/.cache/ccache,id=zfs-ccache-${TARGETARCH} \
     make CC="${CROSS_COMPILE}gcc" -C module -j$(nproc) && \
     make -C module INSTALL_MOD_STRIP=1 INSTALL_MOD_PATH=/tmp/kernel-modules install && \
     ccache -s | tee -a /ccache-stats.txt
+
+# Build proprietary cavalry driver and install firmware from cavalry build context
+COPY --from=cavalry / /tmp/cavalry
+RUN if [ -d /tmp/cavalry/cavalry_v3 ]; then \
+        make CC="${CROSS_COMPILE}gcc" O=/kernel-out LOCALVERSION="-${LOCALVERSION}" \
+            M=/tmp/cavalry/cavalry_v3 -C /kernel-src -j$(nproc) \
+            AMBARELLA_DRV_CFLAGS="-I/tmp/cavalry/include/cavalry_v3 -DAMBA_AMYOC_BUILD -DAMBA_SOC_N1_655" && \
+        make CC="${CROSS_COMPILE}gcc" O=/kernel-out LOCALVERSION="-${LOCALVERSION}" \
+            M=/tmp/cavalry/cavalry_v3 -C /kernel-src INSTALL_MOD_STRIP=1 \
+            INSTALL_MOD_PATH=/tmp/kernel-modules modules_install && \
+        mkdir -p /tmp/kernel-modules/lib/firmware && \
+        install -m 0644 /tmp/cavalry/firmware/cavalry_v3/n1_655/cavalry.bin /tmp/kernel-modules/lib/firmware/cavalry.bin; \
+    fi
+
+# Build amba_virt driver from amba-virt build context
+COPY --from=amba-virt / /tmp/amba-virt
+RUN if [ -d /tmp/amba-virt/poc/kmod ]; then \
+        mkdir -p /tmp/amba_virt_kmod/include && \
+        cp /tmp/amba-virt/poc/kmod/nohyper/amba_virt_nohyper.c /tmp/amba_virt_kmod/ && \
+        cp /tmp/amba-virt/poc/kmod/common/amba_virt_core.c /tmp/amba_virt_kmod/ && \
+        cp /tmp/amba-virt/poc/kmod/common/amba_virt_core.h /tmp/amba_virt_kmod/ && \
+        cp /tmp/amba-virt/poc/include/uapi/amba_virt.h /tmp/amba_virt_kmod/include/ && \
+        printf 'ccflags-y += -I$$(src)/include\nobj-m := amba_virt.o\namba_virt-y := amba_virt_nohyper.o amba_virt_core.o\n' > /tmp/amba_virt_kmod/Kbuild && \
+        make CC="${CROSS_COMPILE}gcc" O=/kernel-out LOCALVERSION="-${LOCALVERSION}" \
+            M=/tmp/amba_virt_kmod -C /kernel-src -j$(nproc) && \
+        make CC="${CROSS_COMPILE}gcc" O=/kernel-out LOCALVERSION="-${LOCALVERSION}" \
+            M=/tmp/amba_virt_kmod -C /kernel-src INSTALL_MOD_STRIP=1 \
+            INSTALL_MOD_PATH=/tmp/kernel-modules modules_install; \
+    fi
 
 FROM builder as artifacts
 
@@ -178,11 +202,7 @@ RUN DVER=$(basename $(find /tmp/kernel-modules/lib/modules/ -mindepth 1 -maxdept
            -type f \( -name 'Makefile*' -o -name 'Kconfig*' -o -name 'Kbuild*' -o \
                       -name '*.lds' -o -name '*.pl' -o -name '*.sh' \) | \
          tar cf - -T - | (cd $dir; tar xf -) && \
-    if [ -f /kernel-out/certs/dev_key.pem ]; then \
-        mkdir -p $dir/certs && \
-        cp /kernel-out/certs/dev_key.pem $dir/certs/signing_key.pem && \
-        cp /kernel-out/certs/signing_key.x509 $dir/certs/; \
-    elif [ -f /kernel-out/certs/signing_key.pem ]; then \
+    if [ -f /kernel-out/certs/signing_key.pem ]; then \
         mkdir -p $dir/certs && \
         cp /kernel-out/certs/signing_key.pem $dir/certs/ && \
         cp /kernel-out/certs/signing_key.x509 $dir/certs/; \

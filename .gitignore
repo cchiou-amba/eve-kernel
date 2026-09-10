@@ -144,6 +144,7 @@ extra_certificates
 signing_key.pem
 signing_key.priv
 signing_key.x509
+dev_key.*
 x509.genkey
 
 # Kconfig presets
