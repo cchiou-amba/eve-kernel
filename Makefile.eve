@@ -70,6 +70,21 @@ endif
 ifneq ($(wildcard ../../amba-virt),)
     BUILD_CONTEXT_ARGS += --build-context amba-virt=../../amba-virt
 endif
+ifneq ($(wildcard ../amba_otp),)
+    BUILD_CONTEXT_ARGS += --build-context amba_otp=../amba_otp
+endif
+ifneq ($(wildcard ../dsplog),)
+    BUILD_CONTEXT_ARGS += --build-context dsplog=../dsplog
+endif
+ifneq ($(wildcard ../pci_platform),)
+    BUILD_CONTEXT_ARGS += --build-context pci_platform=../pci_platform
+endif
+ifneq ($(wildcard ../ambvideo),)
+    BUILD_CONTEXT_ARGS += --build-context ambvideo=../ambvideo
+endif
+ifneq ($(wildcard ../pwr_gpu),)
+    BUILD_CONTEXT_ARGS += --build-context pwr_gpu=../pwr_gpu
+endif
 
 kernel-build-%: Makefile.eve linuxkit | ensure-builder
 	@echo "Building kernel version $(BRANCH):$(VERSION)-$* with compiler $*"

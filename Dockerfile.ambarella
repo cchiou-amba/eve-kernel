@@ -1,4 +1,12 @@
 #syntax=docker/dockerfile:1.6
+FROM scratch AS cavalry
+FROM scratch AS amba-virt
+FROM scratch AS amba_otp
+FROM scratch AS dsplog
+FROM scratch AS pci_platform
+FROM scratch AS ambvideo
+FROM scratch AS pwr_gpu
+
 ARG ALPINE_VERSION=3.16
 ARG KERNEL_CONFIG=eve_defconfig
 ARG KERNEL_BIN=arch/arm64/boot/Image
@@ -99,6 +107,12 @@ RUN ! grep -q -E 'CONFIG_BPF_KPROBE_OVERRIDE=[y|m]' .config || (echo "Cannot set
 
 RUN make -j$(nproc) mrproper
 RUN make O=/kernel-out ${KERNEL_CONFIG}
+RUN mkdir -p /kernel-out/certs && \
+    if [ -f /kernel-src/certs/dev_key.pem ]; then \
+        echo "Using persistent developer signing key..." && \
+        cp /kernel-src/certs/dev_key.pem /kernel-out/certs/dev_key.pem && \
+        sed -i 's|^CONFIG_MODULE_SIG_KEY=.*|CONFIG_MODULE_SIG_KEY="certs/dev_key.pem"|' /kernel-out/.config; \
+    fi
 RUN --mount=type=cache,target=/root/.cache/ccache,id=kernel-ccache-${TARGETARCH} \
     ccache -z \
     && echo "Building kernel for ${TARGETARCH} with ARCH=${ARCH} and CROSS_COMPILE=${CROSS_COMPILE}" \
@@ -158,6 +172,68 @@ RUN if [ -d /tmp/amba-virt/poc/kmod ]; then \
             INSTALL_MOD_PATH=/tmp/kernel-modules modules_install; \
     fi
 
+# Build amba_otp driver from amba_otp build context
+COPY --from=amba_otp / /tmp/amba_otp
+RUN if [ -d /tmp/amba_otp/sec_v3 ]; then \
+        make CC="${CROSS_COMPILE}gcc" O=/kernel-out LOCALVERSION="-${LOCALVERSION}" \
+            M=/tmp/amba_otp/sec_v3 -C /kernel-src -j$(nproc) && \
+        make CC="${CROSS_COMPILE}gcc" O=/kernel-out LOCALVERSION="-${LOCALVERSION}" \
+            M=/tmp/amba_otp/sec_v3 -C /kernel-src INSTALL_MOD_STRIP=1 \
+            INSTALL_MOD_PATH=/tmp/kernel-modules modules_install; \
+    fi
+
+# Build dsplog driver from dsplog build context
+COPY --from=dsplog / /tmp/dsplog
+RUN if [ -f /tmp/dsplog/dsplog_core.c ]; then \
+        make CC="${CROSS_COMPILE}gcc" O=/kernel-out LOCALVERSION="-${LOCALVERSION}" \
+            M=/tmp/dsplog -C /kernel-src -j$(nproc) && \
+        make CC="${CROSS_COMPILE}gcc" O=/kernel-out LOCALVERSION="-${LOCALVERSION}" \
+            M=/tmp/dsplog -C /kernel-src INSTALL_MOD_STRIP=1 \
+            INSTALL_MOD_PATH=/tmp/kernel-modules modules_install; \
+    fi
+
+# Build pci_platform driver from pci_platform build context
+COPY --from=pci_platform / /tmp/pci_platform
+RUN if [ -f /tmp/pci_platform/amba_pci_platform_core.c ]; then \
+        make CC="${CROSS_COMPILE}gcc" O=/kernel-out LOCALVERSION="-${LOCALVERSION}" \
+            M=/tmp/pci_platform -C /kernel-src -j$(nproc) && \
+        make CC="${CROSS_COMPILE}gcc" O=/kernel-out LOCALVERSION="-${LOCALVERSION}" \
+            M=/tmp/pci_platform -C /kernel-src INSTALL_MOD_STRIP=1 \
+            INSTALL_MOD_PATH=/tmp/kernel-modules modules_install; \
+    fi
+
+# Build ambvideo driver and install DSP firmware from ambvideo build context
+COPY --from=ambvideo / /tmp/ambvideo
+RUN if [ -d /tmp/ambvideo/dsp_v6 ]; then \
+        make CC="${CROSS_COMPILE}gcc" O=/kernel-out LOCALVERSION="-${LOCALVERSION}" \
+            M=/tmp/ambvideo/dsp_v6 -C /kernel-src -j$(nproc) && \
+        make CC="${CROSS_COMPILE}gcc" O=/kernel-out LOCALVERSION="-${LOCALVERSION}" \
+            M=/tmp/ambvideo/dsp_v6 -C /kernel-src INSTALL_MOD_STRIP=1 \
+            INSTALL_MOD_PATH=/tmp/kernel-modules modules_install && \
+        if [ -d /tmp/ambvideo/firmware/n1_655 ]; then \
+            mkdir -p /tmp/kernel-modules/lib/firmware && \
+            cp -a /tmp/ambvideo/firmware/n1_655/* /tmp/kernel-modules/lib/firmware/; \
+        fi; \
+    fi
+
+# Build pwr_gpu driver from pwr_gpu build context
+COPY --from=pwr_gpu / /tmp/pwr_gpu
+RUN if [ -d /tmp/pwr_gpu/build ]; then \
+        make -C /tmp/pwr_gpu \
+            PVR_BUILD_DIR=ambarella \
+            RGX_BVNC=36.56.104.183 \
+            KERNELDIR=/kernel-out \
+            ARCH=${ARCH} \
+            CROSS_COMPILE="${CROSS_COMPILE}" \
+            WINDOW_SYSTEM=lws-generic \
+            BUILD=release \
+            kbuild -j$(nproc) && \
+        DVER=$(basename "$(find /tmp/kernel-modules/lib/modules/ -mindepth 1 -maxdepth 1)") && \
+        mkdir -p /tmp/kernel-modules/lib/modules/$DVER/extra && \
+        find /tmp/pwr_gpu -name "pvrsrvkm.ko" -exec cp {} /tmp/kernel-modules/lib/modules/$DVER/extra/ \; ; \
+    fi
+
+
 FROM builder as artifacts
 
 WORKDIR /kernel-out
@@ -202,7 +278,11 @@ RUN DVER=$(basename $(find /tmp/kernel-modules/lib/modules/ -mindepth 1 -maxdept
            -type f \( -name 'Makefile*' -o -name 'Kconfig*' -o -name 'Kbuild*' -o \
                       -name '*.lds' -o -name '*.pl' -o -name '*.sh' \) | \
          tar cf - -T - | (cd $dir; tar xf -) && \
-    if [ -f /kernel-out/certs/signing_key.pem ]; then \
+    if [ -f /kernel-out/certs/dev_key.pem ]; then \
+        mkdir -p $dir/certs && \
+        cp /kernel-out/certs/dev_key.pem $dir/certs/signing_key.pem && \
+        cp /kernel-out/certs/signing_key.x509 $dir/certs/; \
+    elif [ -f /kernel-out/certs/signing_key.pem ]; then \
         mkdir -p $dir/certs && \
         cp /kernel-out/certs/signing_key.pem $dir/certs/ && \
         cp /kernel-out/certs/signing_key.x509 $dir/certs/; \

@@ -4,6 +4,14 @@
 
 menu "Ambarella SoC drivers"
 
+config AMBARELLA_VOUT_RPC
+	bool "Ambarella VOUT typed RPC"
+	depends on ARCH_AMBARELLA
+	default y
+	help
+	  Build the stable in-kernel typed RPC interface used by Ambarella
+	  display producers and the VOUT provider.
+
 config AMBARELLA_SUPPORT_GDMA
 	bool "Ambarella Enable GDMA"
         depends on ARCH_AMBARELLA
