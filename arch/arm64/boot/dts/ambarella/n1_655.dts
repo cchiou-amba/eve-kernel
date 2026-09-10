@@ -87,3 +87,67 @@
 
 	status = "disabled";
 };
+
+&rtc0 {
+	status = "okay";
+};
+
+&watchdog0 {
+	status = "okay";
+};
+
+&i2c0 {
+	status = "okay";
+};
+
+&i2c1 {
+	status = "okay";
+};
+
+&i2c2 {
+	status = "okay";
+};
+
+&i2c3 {
+	status = "okay";
+};
+
+&spi0 {
+	status = "okay";
+};
+
+&spi1 {
+	status = "okay";
+};
+
+&spi2 {
+	status = "okay";
+};
+
+&spi3 {
+	status = "okay";
+};
+
+&can0 {
+	clock-names = "gclk_can";
+	status = "okay";
+};
+
+&can1 {
+	clock-names = "gclk_can";
+	status = "okay";
+};
+
+&can2 {
+	clock-names = "gclk_can";
+	status = "okay";
+};
+
+&uart1 {
+	status = "okay";
+};
+
+&{/apb@ffe4000000/ir@e4001000} {
+	status = "okay";
+};
+

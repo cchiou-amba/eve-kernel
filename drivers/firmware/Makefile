@@ -28,6 +28,7 @@ obj-$(CONFIG_TURRIS_MOX_RWTM)	+= turris-mox-rwtm.o
 
 obj-y				+= arm_ffa/
 obj-y				+= arm_scmi/
+obj-y				+= ambarella/
 obj-y				+= broadcom/
 obj-y				+= cirrus/
 obj-y				+= meson/

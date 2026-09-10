@@ -182,6 +182,12 @@ config RTC_DRV_88PM80X
 	  This driver can also be built as a module. If so, the module
 	  will be called rtc-88pm80x.
 
+config RTC_DRV_AMBARELLA
+	tristate "Ambarella SoC RTC"
+	depends on ARCH_AMBARELLA
+	help
+	  RTC (Realtime Clock) driver for Ambarella SoC.
+
 config RTC_DRV_ABB5ZES3
 	select REGMAP_I2C
 	tristate "Abracon AB-RTCMC-32.768kHz-B5ZE-S3"

@@ -10,6 +10,8 @@ obj-$(CONFIG_I2C_SCMI)		+= i2c-scmi.o
 obj-$(CONFIG_I2C_CCGX_UCSI)	+= i2c-ccgx-ucsi.o
 
 # PC SMBus host controller drivers
+obj-$(CONFIG_I2C_AMBARELLA)	+= i2c-ambarella.o
+obj-$(CONFIG_I2C_AMBARELLA_SLAVE)	+= i2c-ambarella-slave.o
 obj-$(CONFIG_I2C_ALI1535)	+= i2c-ali1535.o
 obj-$(CONFIG_I2C_ALI1563)	+= i2c-ali1563.o
 obj-$(CONFIG_I2C_ALI15X3)	+= i2c-ali15x3.o

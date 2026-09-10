@@ -241,6 +241,7 @@ static const struct amba_phyrst_of_data amba_phyrst_usb32_of_data = {
 static const struct of_device_id amba_phyrst_dt_ids[] = {
 	{ .compatible = "ambarella,usb32-phyrst", .data = &amba_phyrst_usb32_of_data },
 	{ .compatible = "ambarella,pcie-phyrst", .data = &amba_phyrst_pcie_of_data },
+	{ .compatible = "ambarella,excelsior-phyrst", .data = &amba_phyrst_pcie_of_data },
 	{ /* sentinel */ }
 };
 

@@ -1789,3 +1789,8 @@ int kvm_arch_ptp_get_crosststamp(u64 *cycle, struct timespec64 *ts,
 	return 0;
 }
 EXPORT_SYMBOL_GPL(kvm_arch_ptp_get_crosststamp);
+#ifdef CONFIG_ARCH_AMBARELLA
+#ifdef CONFIG_CPU_FREQ
+#include "ambarella_timer_fixup.c"
+#endif
+#endif

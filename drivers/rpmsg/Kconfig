@@ -119,4 +119,6 @@ config IMX_RPMSG_TTY
 	  executed by the command "echo <string> > <accordingly node>", thus
 	  remote M core would receive the string.
 
+source "drivers/rpmsg/ambarella/Kconfig"
+
 endmenu

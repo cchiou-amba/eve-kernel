@@ -25,6 +25,7 @@ obj-$(CONFIG_IR_XMP_DECODER) += ir-xmp-decoder.o
 
 # stand-alone IR receivers/transmitters  - please keep it alphabetically
 # sorted by Kconfig name (e. g. LC_ALL=C sort Makefile)
+obj-$(CONFIG_IR_AMBARELLA) += ir-ambarella.o
 obj-$(CONFIG_IR_ENE) += ene_ir.o
 obj-$(CONFIG_IR_FINTEK) += fintek-cir.o
 obj-$(CONFIG_IR_GPIO_CIR) += gpio-ir-recv.o

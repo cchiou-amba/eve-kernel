@@ -14,6 +14,7 @@ obj-$(CONFIG_DMATEST) += dmatest.o
 
 #devices
 obj-$(CONFIG_ALTERA_MSGDMA) += altera-msgdma.o
+obj-$(CONFIG_AMBARELLA_DMA) += ambarella_dma.o
 obj-$(CONFIG_AMBA_PL08X) += amba-pl08x.o
 obj-$(CONFIG_AMCC_PPC440SPE_ADMA) += ppc4xx/
 obj-$(CONFIG_AMD_PTDMA) += ptdma/

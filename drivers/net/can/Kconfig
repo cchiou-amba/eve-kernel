@@ -93,6 +93,12 @@ config CAN_AT91
 	  This is a driver for the SoC CAN controller in Atmel's AT91SAM9263
 	  and AT91SAM9X5 processors.
 
+config CAN_AMBARELLA
+	tristate "Ambarella CAN controller"
+	depends on ARCH_AMBARELLA
+	help
+	  This is a driver for the SoC CAN controller in Ambarella processors.
+
 config CAN_CAN327
 	tristate "Serial / USB serial ELM327 based OBD-II Interfaces (can327)"
 	depends on TTY
