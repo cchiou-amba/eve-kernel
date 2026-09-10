@@ -42,14 +42,21 @@ static int ambarella_restart_handler(struct notifier_block *this,
 {
 	local_irq_disable();
 	regmap_update_bits(reg_rct, SOFT_OR_DLL_RESET_OFFSET, g_soft_reset_mask, 0x0);
+	dsb(sy);
+	isb();
 	regmap_update_bits(reg_rct, SOFT_OR_DLL_RESET_OFFSET, g_soft_reset_mask, g_soft_reset_mask);
+	dsb(sy);
+	isb();
+	mdelay(100);
+	while (1)
+		cpu_relax();
 
 	return NOTIFY_DONE;
 }
 
 static struct notifier_block ambarella_restart_nb = {
 	.notifier_call = ambarella_restart_handler,
-	.priority = 128,
+	.priority = 255,
 };
 
 static const struct soc_device_attribute ambarella_reboot_socinfo[] = {
