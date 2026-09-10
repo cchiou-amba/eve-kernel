@@ -1360,7 +1360,7 @@
 		};
 	};
 
-	ca78ae_scratchpad@0xfff0200000 {
+	ca78ae_scratchpad@fff0200000 {
 		compatible = "simple-bus";
 		#address-cells = <1>;
 		#size-cells = <1>;
