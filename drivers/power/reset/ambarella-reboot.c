@@ -30,19 +30,19 @@
 #include <linux/reboot.h>
 #include <linux/regmap.h>
 #include <linux/mfd/syscon.h>
+#include <linux/sys_soc.h>
 
 #define SOFT_OR_DLL_RESET_OFFSET	0x68
-#define SOFT_RESET			0x1
+static unsigned int g_soft_reset_mask;
 
 static struct regmap *reg_rct = NULL;
 
 static int ambarella_restart_handler(struct notifier_block *this,
 				unsigned long mode, void *cmd)
 {
-
 	local_irq_disable();
-	regmap_update_bits(reg_rct, SOFT_OR_DLL_RESET_OFFSET, SOFT_RESET, 0x0);
-	regmap_update_bits(reg_rct, SOFT_OR_DLL_RESET_OFFSET, SOFT_RESET, SOFT_RESET);
+	regmap_update_bits(reg_rct, SOFT_OR_DLL_RESET_OFFSET, g_soft_reset_mask, 0x0);
+	regmap_update_bits(reg_rct, SOFT_OR_DLL_RESET_OFFSET, g_soft_reset_mask, g_soft_reset_mask);
 
 	return NOTIFY_DONE;
 }
@@ -52,10 +52,27 @@ static struct notifier_block ambarella_restart_nb = {
 	.priority = 128,
 };
 
+static const struct soc_device_attribute ambarella_reboot_socinfo[] = {
+	{ .soc_id = "cv8" },
+	{ .soc_id = "cv3ad655" },
+	{ .soc_id = "cv3ad685" },
+	{ .soc_id = "n1" },
+	{ .machine = "n1-655 cooper pro" },
+	{ .family = "Ambarella 5nm" },
+	{/* sentinel */}
+};
+
 static int ambarella_reboot_probe(struct platform_device *pdev)
 {
 	struct device_node *np = pdev->dev.of_node;
 	int err;
+	const struct soc_device_attribute *soc;
+
+	soc = soc_device_match(ambarella_reboot_socinfo);
+	if (soc)
+		g_soft_reset_mask = 0x3;
+	else
+		g_soft_reset_mask = 0x1;
 
 	reg_rct = syscon_regmap_lookup_by_phandle(np, "amb,rct-regmap");
 	if (IS_ERR(reg_rct)) {
@@ -67,7 +84,7 @@ static int ambarella_reboot_probe(struct platform_device *pdev)
 	if (err)
 		dev_err(&pdev->dev, "cannot register restart handler (err=%d)\n", err);
 	else
-		dev_info(&pdev->dev, "Register restart\n");
+		dev_info(&pdev->dev, "Register restart (mask=0x%x)\n", g_soft_reset_mask);
 
 	return err;
 }
@@ -76,6 +93,7 @@ static const struct of_device_id ambarella_reboot_of_match[] = {
 	{ .compatible = "ambarella,reboot" },
 	{}
 };
+MODULE_DEVICE_TABLE(of, ambarella_reboot_of_match);
 
 static struct platform_driver ambarella_reboot_driver = {
 	.probe = ambarella_reboot_probe,
@@ -85,3 +103,7 @@ static struct platform_driver ambarella_reboot_driver = {
 	},
 };
 module_platform_driver(ambarella_reboot_driver);
+
+MODULE_AUTHOR("Jorney <qtu@ambarella.com>");
+MODULE_DESCRIPTION("Ambarella SoC reset driver");
+MODULE_LICENSE("GPL v2");
