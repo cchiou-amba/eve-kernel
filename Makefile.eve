@@ -69,7 +69,9 @@ ifneq ($(wildcard ../drivers/cavalry),)
 else ifneq ($(wildcard ../cavalry),)
     BUILD_CONTEXT_ARGS += --build-context cavalry=../cavalry
 endif
-ifneq ($(wildcard ../poc/kmod),)
+ifneq ($(wildcard ../drivers/amba_virt),)
+    BUILD_CONTEXT_ARGS += --build-context amba-virt=../drivers/amba_virt
+else ifneq ($(wildcard ../poc/kmod),)
     BUILD_CONTEXT_ARGS += --build-context amba-virt=..
 else ifneq ($(wildcard ../../amba-virt),)
     BUILD_CONTEXT_ARGS += --build-context amba-virt=../../amba-virt
