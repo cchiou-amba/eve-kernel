@@ -10,7 +10,7 @@ BUILD_USER:=$(shell id -un)
 IMAGE_REPOSITORY?=lfedge/eve-kernel
 
 LINUXKIT_VERSION=58c36c9eb0c32acf66ae7877d18a9ad24d59d73e
-GOBIN=/tmp/linuxkit-$(LINUXKIT_VERSION)-$(USER)
+GOBIN=/tmp/linuxkit-$(LINUXKIT_VERSION)
 LK=$(GOBIN)/linuxkit
 
 BUILD_KIT_VERSION=v0.12.5
@@ -64,12 +64,42 @@ $(LK):
 KERNEL_OCI_FILE:=$(shell mktemp -u)-kernel.tar
 
 BUILD_CONTEXT_ARGS=
-ifneq ($(wildcard ../cavalry),)
+ifneq ($(wildcard ../drivers/cavalry),)
+    BUILD_CONTEXT_ARGS += --build-context cavalry=../drivers/cavalry
+else ifneq ($(wildcard ../cavalry),)
     BUILD_CONTEXT_ARGS += --build-context cavalry=../cavalry
 endif
-ifneq ($(wildcard ../../amba-virt),)
+ifneq ($(wildcard ../poc/kmod),)
+    BUILD_CONTEXT_ARGS += --build-context amba-virt=..
+else ifneq ($(wildcard ../../amba-virt),)
     BUILD_CONTEXT_ARGS += --build-context amba-virt=../../amba-virt
 endif
+ifneq ($(wildcard ../drivers/amba_otp),)
+    BUILD_CONTEXT_ARGS += --build-context amba_otp=../drivers/amba_otp
+else ifneq ($(wildcard ../amba_otp),)
+    BUILD_CONTEXT_ARGS += --build-context amba_otp=../amba_otp
+endif
+ifneq ($(wildcard ../drivers/dsplog),)
+    BUILD_CONTEXT_ARGS += --build-context dsplog=../drivers/dsplog
+else ifneq ($(wildcard ../dsplog),)
+    BUILD_CONTEXT_ARGS += --build-context dsplog=../dsplog
+endif
+ifneq ($(wildcard ../drivers/pci_platform),)
+    BUILD_CONTEXT_ARGS += --build-context pci_platform=../drivers/pci_platform
+else ifneq ($(wildcard ../pci_platform),)
+    BUILD_CONTEXT_ARGS += --build-context pci_platform=../pci_platform
+endif
+ifneq ($(wildcard ../drivers/ambvideo),)
+    BUILD_CONTEXT_ARGS += --build-context ambvideo=../drivers/ambvideo
+else ifneq ($(wildcard ../ambvideo),)
+    BUILD_CONTEXT_ARGS += --build-context ambvideo=../ambvideo
+endif
+ifneq ($(wildcard ../drivers/pwr_gpu),)
+    BUILD_CONTEXT_ARGS += --build-context pwr_gpu=../drivers/pwr_gpu
+else ifneq ($(wildcard ../pwr_gpu),)
+    BUILD_CONTEXT_ARGS += --build-context pwr_gpu=../pwr_gpu
+endif
+
 
 kernel-build-%: Makefile.eve linuxkit | ensure-builder
 	@echo "Building kernel version $(BRANCH):$(VERSION)-$* with compiler $*"
