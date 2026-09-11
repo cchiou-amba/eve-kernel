@@ -144,7 +144,13 @@ RUN if [ -d /tmp/cavalry/cavalry_v3 ]; then \
 
 # Build amba_virt driver from amba-virt build context
 COPY --from=amba-virt / /tmp/amba-virt
-RUN if [ -d /tmp/amba-virt/poc/kmod ]; then \
+RUN if [ -f /tmp/amba-virt/Kbuild ]; then \
+        make CC="${CROSS_COMPILE}gcc" O=/kernel-out LOCALVERSION="-${LOCALVERSION}" \
+            M=/tmp/amba-virt -C /kernel-src -j$(nproc) && \
+        make CC="${CROSS_COMPILE}gcc" O=/kernel-out LOCALVERSION="-${LOCALVERSION}" \
+            M=/tmp/amba-virt -C /kernel-src INSTALL_MOD_STRIP=1 \
+            INSTALL_MOD_PATH=/tmp/kernel-modules modules_install; \
+    elif [ -d /tmp/amba-virt/poc/kmod ]; then \
         mkdir -p /tmp/amba_virt_kmod/include && \
         cp /tmp/amba-virt/poc/kmod/nohyper/amba_virt_nohyper.c /tmp/amba_virt_kmod/ && \
         cp /tmp/amba-virt/poc/kmod/common/amba_virt_core.c /tmp/amba_virt_kmod/ && \
