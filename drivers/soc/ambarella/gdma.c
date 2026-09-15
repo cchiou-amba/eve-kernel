@@ -32,6 +32,8 @@
 #include <linux/dma-mapping.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
+#include <linux/jiffies.h>
+#include <linux/overflow.h>
 #include <soc/ambarella/iav_helper.h>
 #include <soc/ambarella/gdma.h>
 
@@ -52,9 +54,40 @@ static struct ambagdma_device *ambarella_gdma;
 /* transfer 6 big blocks (although maximum is 8), because we may do another 1 small block and 1 line. total 8 Ops */
 #define MAX_TRANSFER_SIZE_ONCE		(MAX_TRANSFER_SIZE_2D_UNIT * 6)	/* 48 MB */
 #define MAX_OPS				8
+#define GDMA_TRANSFER_TIMEOUT_MS	100
 
 static struct completion	transfer_completion;
 static DEFINE_MUTEX(transfer_mutex);
+static bool transfer_failed;
+
+static int wait_transfer_complete(void)
+{
+	unsigned long timeout;
+	u32 pending_ops;
+
+	timeout = wait_for_completion_timeout(&transfer_completion,
+		msecs_to_jiffies(GDMA_TRANSFER_TIMEOUT_MS));
+	if (timeout)
+		return 0;
+
+	/*
+	 * Fail closed after a missed completion. Even when the pending count
+	 * has reached zero, an edge-triggered IRQ may still arrive after the
+	 * next transfer reinitializes the completion and falsely complete it.
+	 * Keep the engine blocked until the driver is reprobed.
+	 */
+	disable_irq(ambarella_gdma->irq);
+	pending_ops = readl_relaxed(ambarella_gdma->regbase +
+		GDMA_PENDING_OPS_OFFSET);
+	reinit_completion(&transfer_completion);
+	transfer_failed = true;
+	enable_irq(ambarella_gdma->irq);
+
+	dev_err(ambarella_gdma->dev,
+		"GDMA transfer timed out after %u ms (%u pending)\n",
+		GDMA_TRANSFER_TIMEOUT_MS, pending_ops);
+	return -ETIMEDOUT;
+}
 
 /* handle 8MB at one time */
 static inline int transfer_big_unit(u8 *dest_addr, u8 *src_addr, u32 size)
@@ -87,8 +120,9 @@ static inline int transfer_big_unit(u8 *dest_addr, u8 *src_addr, u32 size)
 		writel_relaxed(0, ambarella_gdma->regbase + GDMA_CLUT_BASE_OFFSET);
 
 		/* start 2D copy */
+		reinit_completion(&transfer_completion);
 		writel(1, ambarella_gdma->regbase + GDMA_OPCODE_OFFSET);
-		wait_for_completion(&transfer_completion);
+		return wait_transfer_complete();
 	}
 	return 0;
 
@@ -121,10 +155,9 @@ static inline int transfer_small_unit(u8 *dest_addr, u8 *src_addr, u32 size)
 	writel_relaxed(0, ambarella_gdma->regbase + GDMA_CLUT_BASE_OFFSET);
 
 	/* start linear copy */
+	reinit_completion(&transfer_completion);
 	writel(0, ambarella_gdma->regbase + GDMA_OPCODE_OFFSET);
-	wait_for_completion(&transfer_completion);
-
-	return 0;
+	return wait_transfer_complete();
 }
 
 /* this is async function, just fill dma registers and let it run*/
@@ -145,9 +178,10 @@ static inline int transfer_once(u8 *dest_addr, u8 *src_addr, u32 size)
 	big_count = size/MAX_TRANSFER_SIZE_2D_UNIT;
 	//big pages (each is 8MB)
 	for (i = big_count ; i > 0; i--) {
-		transfer_big_unit(dest_addr + transferred_bytes,
-						src_addr  + transferred_bytes,
-						MAX_TRANSFER_SIZE_2D_UNIT);
+		if (transfer_big_unit(dest_addr + transferred_bytes,
+					     src_addr + transferred_bytes,
+					     MAX_TRANSFER_SIZE_2D_UNIT))
+			return -ETIMEDOUT;
 		transferred_bytes += MAX_TRANSFER_SIZE_2D_UNIT;
 	}
 	remain_bytes =  size - transferred_bytes;
@@ -155,16 +189,19 @@ static inline int transfer_once(u8 *dest_addr, u8 *src_addr, u32 size)
 	//transfer rows (align to TRANSFER_2D_WIDTH)
 	rows_count = remain_bytes / TRANSFER_2D_WIDTH;
 	if (rows_count > 0) {
-		transfer_big_unit(dest_addr + transferred_bytes,
-							src_addr  + transferred_bytes,
-							TRANSFER_2D_WIDTH * rows_count);
+		if (transfer_big_unit(dest_addr + transferred_bytes,
+				     src_addr + transferred_bytes,
+				     TRANSFER_2D_WIDTH * rows_count))
+			return -ETIMEDOUT;
 		transferred_bytes += TRANSFER_2D_WIDTH * rows_count;
 		remain_bytes =  size - transferred_bytes;
 	}
 
 	if (remain_bytes > 0) {
-		transfer_small_unit(dest_addr + transferred_bytes,
-						src_addr  + transferred_bytes, remain_bytes);
+		if (transfer_small_unit(dest_addr + transferred_bytes,
+				       src_addr + transferred_bytes,
+				       remain_bytes))
+			return -ETIMEDOUT;
 	}
 
 	return 0;
@@ -176,6 +213,7 @@ int dma_memcpy(u8 *dest_addr, u8 *src_addr, u32 size)
 	int remain_size = size;
 	int transferred_size = 0;
 	int current_transfer_size;
+	int ret = 0;
 
 	if (size <= 0) {
 		return -1;
@@ -187,6 +225,10 @@ int dma_memcpy(u8 *dest_addr, u8 *src_addr, u32 size)
 	}
 
 	mutex_lock(&transfer_mutex);
+	if (!ambarella_gdma || transfer_failed) {
+		ret = -EIO;
+		goto out_unlock;
+	}
 
 	ambcache_clean_range((void *)__phys_to_virt((unsigned long)src_addr), size);
 
@@ -199,17 +241,21 @@ int dma_memcpy(u8 *dest_addr, u8 *src_addr, u32 size)
 			remain_size = 0;
 		}
 
-		transfer_once(dest_addr + transferred_size,
+		ret = transfer_once(dest_addr + transferred_size,
 			src_addr + transferred_size, current_transfer_size);
+		if (ret)
+			break;
 
 		transferred_size += current_transfer_size;
 	}
 
-	ambcache_inv_range((void *)__phys_to_virt((unsigned long)dest_addr), size);
+	if (!ret)
+		ambcache_inv_range((void *)__phys_to_virt((unsigned long)dest_addr), size);
 
+out_unlock:
 	mutex_unlock(&transfer_mutex);
 
-	return 0;
+	return ret;
 }
 EXPORT_SYMBOL(dma_memcpy);
 
@@ -219,6 +265,7 @@ int dma_noncache_memcpy(u8 *dest_addr, u8 *src_addr, u32 size)
 	int remain_size = size;
 	int transferred_size = 0;
 	int current_transfer_size;
+	int ret = 0;
 
 	if (size <= 0) {
 		return -1;
@@ -230,6 +277,10 @@ int dma_noncache_memcpy(u8 *dest_addr, u8 *src_addr, u32 size)
 	}
 
 	mutex_lock(&transfer_mutex);
+	if (!ambarella_gdma || transfer_failed) {
+		ret = -EIO;
+		goto out_unlock;
+	}
 	while (remain_size > 0)	{
 		if (remain_size > MAX_TRANSFER_SIZE_ONCE) {
 			remain_size -= MAX_TRANSFER_SIZE_ONCE;
@@ -239,14 +290,17 @@ int dma_noncache_memcpy(u8 *dest_addr, u8 *src_addr, u32 size)
 			remain_size = 0;
 		}
 
-		transfer_once(dest_addr + transferred_size,
+		ret = transfer_once(dest_addr + transferred_size,
 			src_addr + transferred_size, current_transfer_size);
+		if (ret)
+			break;
 
 		transferred_size += current_transfer_size;
 	}
+out_unlock:
 	mutex_unlock(&transfer_mutex);
 
-	return 0;
+	return ret;
 }
 EXPORT_SYMBOL(dma_noncache_memcpy);
 
@@ -276,8 +330,10 @@ static inline int transfer_pitch_unit(u8 *dest_addr, u8 *src_addr,
 		writel_relaxed(0, ambarella_gdma->regbase + GDMA_CLUT_BASE_OFFSET);
 
 		/* start 2D copy */
+		reinit_completion(&transfer_completion);
 		writel(1, ambarella_gdma->regbase + GDMA_OPCODE_OFFSET);
-		wait_for_completion(&transfer_completion);
+		if (wait_transfer_complete())
+			return -ETIMEDOUT;
 
 		height = height - MAX_TRANSFER_2D_HEIGHT;
 		src_addr = src_addr + src_pitch * MAX_TRANSFER_2D_HEIGHT;
@@ -301,8 +357,10 @@ static inline int transfer_pitch_unit(u8 *dest_addr, u8 *src_addr,
 		writel_relaxed(0, ambarella_gdma->regbase + GDMA_CLUT_BASE_OFFSET);
 
 		/* start 2D copy */
+		reinit_completion(&transfer_completion);
 		writel(1, ambarella_gdma->regbase + GDMA_OPCODE_OFFSET);
-		wait_for_completion(&transfer_completion);
+		if (wait_transfer_complete())
+			return -ETIMEDOUT;
 	}
 
 	return 0;
@@ -312,10 +370,16 @@ static inline int transfer_pitch_unit(u8 *dest_addr, u8 *src_addr,
 /* this is synchronous function, will wait till transfer finishes  width =< 4096 */
 int dma_pitch_memcpy(struct gdma_param *params)
 {
-	int size = params->src_pitch * params->height;
+	size_t size;
+	int ret;
 
-	if (size <= 0 || params->src_pitch <= 0 || params->dest_pitch <= 0
-		|| params->width > TRANSFER_2D_WIDTH) {
+	if (!params || !params->height || !params->width ||
+	    !params->src_pitch || !params->dest_pitch ||
+	    params->width > TRANSFER_2D_WIDTH ||
+	    params->width > params->src_pitch ||
+	    params->width > params->dest_pitch ||
+	    check_mul_overflow((size_t)params->src_pitch,
+			       (size_t)params->height, &size)) {
 		printk(" invalid value \n");
 		return -1;
 	}
@@ -326,18 +390,23 @@ int dma_pitch_memcpy(struct gdma_param *params)
 	}
 
 	mutex_lock(&transfer_mutex);
+	if (!ambarella_gdma || transfer_failed) {
+		ret = -EIO;
+		goto out_unlock;
+	}
 	if (!params->src_non_cached) {
 		ambcache_clean_range((void *)params->src_virt_addr, size);
 	}
-	transfer_pitch_unit((u8 *)params->dest_addr, (u8 *)params->src_addr,
+	ret = transfer_pitch_unit((u8 *)params->dest_addr, (u8 *)params->src_addr,
 		params->src_pitch, params->dest_pitch, params->width, params->height);
 
-	if (!params->dest_non_cached) {
+	if (!ret && !params->dest_non_cached) {
 		ambcache_inv_range((void *)params->dest_virt_addr, size);
 	}
+out_unlock:
 	mutex_unlock(&transfer_mutex);
 
-	return 0;
+	return ret;
 }
 
 EXPORT_SYMBOL(dma_pitch_memcpy);
@@ -346,10 +415,20 @@ EXPORT_SYMBOL(dma_pitch_memcpy);
 static void wait_transmit_complete(struct ambagdma_device *amba_gdma)
 {
 	int pending_ops;
+	unsigned long timeout = jiffies + msecs_to_jiffies(GDMA_TRANSFER_TIMEOUT_MS);
+
 	pending_ops = readl_relaxed(amba_gdma->regbase + GDMA_PENDING_OPS_OFFSET);
 
 	while(pending_ops!= 0) {
-		mdelay(10);
+		if (time_after_eq(jiffies, timeout)) {
+			dev_err(amba_gdma->dev,
+				"GDMA still has %u pending operations during remove\n",
+				pending_ops);
+			break;
+		}
+		usleep_range(1000, 2000);
+		pending_ops = readl_relaxed(amba_gdma->regbase +
+			GDMA_PENDING_OPS_OFFSET);
 	}
 }
 
@@ -398,6 +477,7 @@ static int ambarella_gdma_probe(struct platform_device *pdev)
 		return -ENXIO;
 	}
 
+	init_completion(&transfer_completion);
 	ret = devm_request_irq(&pdev->dev, ambagdma->irq,
 			ambarella_gdma_irq, IRQF_TRIGGER_RISING,
 			dev_name(&pdev->dev), ambagdma);
@@ -406,11 +486,12 @@ static int ambarella_gdma_probe(struct platform_device *pdev)
 		return -ENXIO;
 	}
 	ambagdma->dev = &pdev->dev;
-	ambarella_gdma = ambagdma;
 	platform_set_drvdata(pdev, ambagdma);
 
-	/* init completion */
-	init_completion(&transfer_completion);
+	mutex_lock(&transfer_mutex);
+	transfer_failed = false;
+	ambarella_gdma = ambagdma;
+	mutex_unlock(&transfer_mutex);
 
 	dev_info(&pdev->dev, "Ambarella GDMA driver init\n");
 	return 0;
@@ -419,7 +500,11 @@ static int ambarella_gdma_probe(struct platform_device *pdev)
 static int ambarella_gdma_remove(struct platform_device *pdev)
 {
 	struct ambagdma_device *amba_gdma = platform_get_drvdata(pdev);
+
+	mutex_lock(&transfer_mutex);
 	wait_transmit_complete(amba_gdma);
+	ambarella_gdma = NULL;
+	mutex_unlock(&transfer_mutex);
 
 	return 0;
 }
