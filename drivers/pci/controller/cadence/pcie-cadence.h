@@ -135,6 +135,7 @@
  */
 #define CDNS_PCIE_RP_BASE	0x00200000
 #define CDNS_PCIE_RP_CAP_OFFSET 0xc0
+#define CDNS_PCIE_RP_ROOT_STATUS (CDNS_PCIE_RP_CAP_OFFSET + 0x20)
 
 /*
  * Address Translation Registers
@@ -502,23 +503,35 @@ static inline int cdns_pcie_start_link(struct cdns_pcie *pcie)
 
 static inline void cdns_pcie_stop_link(struct cdns_pcie *pcie)
 {
-	if (pcie->ops->stop_link)
+	if (pcie->ops && pcie->ops->stop_link)
 		pcie->ops->stop_link(pcie);
 }
 
 static inline bool cdns_pcie_link_up(struct cdns_pcie *pcie)
 {
-	if (pcie->ops->link_up)
+	if (pcie->ops && pcie->ops->link_up)
 		return pcie->ops->link_up(pcie);
 
 	return true;
 }
 
 #ifdef CONFIG_PCIE_CADENCE_HOST
+int cdns_pcie_host_link_setup(struct cdns_pcie_rc *rc);
+int cdns_pcie_host_init(struct cdns_pcie_rc *rc);
 int cdns_pcie_host_setup(struct cdns_pcie_rc *rc);
 void __iomem *cdns_pci_map_bus(struct pci_bus *bus, unsigned int devfn,
 			       int where);
 #else
+static inline int cdns_pcie_host_link_setup(struct cdns_pcie_rc *rc)
+{
+	return 0;
+}
+
+static inline int cdns_pcie_host_init(struct cdns_pcie_rc *rc)
+{
+	return 0;
+}
+
 static inline int cdns_pcie_host_setup(struct cdns_pcie_rc *rc)
 {
 	return 0;
@@ -555,5 +568,16 @@ void cdns_pcie_disable_phy(struct cdns_pcie *pcie);
 int cdns_pcie_enable_phy(struct cdns_pcie *pcie);
 int cdns_pcie_init_phy(struct device *dev, struct cdns_pcie *pcie);
 extern const struct dev_pm_ops cdns_pcie_pm_ops;
+
+#ifdef CONFIG_ARCH_AMBARELLA
+extern int ambarella_pcie_host_init(struct device *dev, struct cdns_pcie_rc *rc);
+extern int ambarella_pcie_ep_init(struct device *dev,struct cdns_pcie_ep *ep);
+extern int ambarella_pcie_host_setup(struct cdns_pcie_rc *rc);
+extern void __iomem *ambarella_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
+			int where);
+extern void ambarella_pcie_disable_phy(struct cdns_pcie *pcie);
+extern int ambarella_pcie_enable_phy(struct cdns_pcie *pcie);
+extern int ambarella_pcie_init_phy(struct device *dev, struct cdns_pcie *pcie);
+#endif
 
 #endif /* _PCIE_CADENCE_H */
