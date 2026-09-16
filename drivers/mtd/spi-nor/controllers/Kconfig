@@ -16,3 +16,10 @@ config SPI_NXP_SPIFI
 	  SPIFI is a specialized controller for connecting serial SPI
 	  Flash. Enable this option if you have a device with a SPIFI
 	  controller and want to access the Flash as a mtd device.
+
+config SPI_AMBARELLA_QUADSPI
+	tristate "Ambarella Quad SPI NOR controller"
+	depends on ARCH_AMBARELLA || COMPILE_TEST
+	help
+	  This enables support for the Ambarella Quad SPI NOR controller.
+	  We only connect the NOR to this controller.
