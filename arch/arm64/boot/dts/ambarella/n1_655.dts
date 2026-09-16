@@ -1,0 +1,153 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright (c) 2026
+ */
+
+/dts-v1/;
+
+#include "ambarella-n1_655.dtsi"
+
+/ {
+	compatible = "Ambarella N1-655";
+	model = "n1-655 cooper pro";
+
+	/delete-node/psci;
+
+	memory {
+		device_type = "memory";
+		reg = <0x00000000 0x00000000 0x00000008 0x00000000>;
+		#address-cells = <0x00000002>;
+		#size-cells = <0x00000002>;
+		ranges;
+	};
+	reserved-memory {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		cavalry_reserved: cavalry@0 {
+			  compatible = "shared-dma-pool";
+			  reg = <0x00000001 0x00000000 0x00000003 0x00000000>;
+			  no-map;
+		  };
+		cavalry_shared:cavalry@1 {
+			  compatible = "shared-dma-pool";
+			  no-map;
+		  };
+		cavalry_ucode:cavalry@2 {
+			  compatible = "shared-dma-pool";
+			  no-map;
+			  reg = <0x00000000 0x25c00000 0x00000000 0x00400000>;
+		  };
+
+
+	};
+	sub_scheduler0 {
+		compatible = "ambarella,sub-scheduler";
+		interrupts = <0 50 0x4>, <0 51 0x4>, <0 52 0x4>, <0 53 0x4>,
+			   <0 50 0x4>, <0 51 0x4>, <0 52 0x4>, <0 53 0x4>;
+		memory-region = <&cavalry_reserved &cavalry_ucode>;
+		shared-region = <&cavalry_shared>;
+	};
+
+	firmware {
+		/delete-node/optee;
+	};
+};
+
+
+&sdmmc0 {
+	status = "okay";
+	non-removable;
+};
+
+&usb_cdnsp {
+	status = "okay";
+	hub-pwr-gpios = <&gpio 3 1>;
+	hub-rst-gpios = <&gpio 19 0>;
+};
+
+&mac0 {
+	status = "okay";
+	rst-gpios = <&gpio 14 1>;
+	rst-gpios-delay = <150 100>;
+	phy-handle = <&maca_phy0>;
+	phy-mode = "rgmii-rxid";
+	/delete-property/ amb,sgmii-regmap;
+	mdio {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		compatible = "snps,dwmac-mdio";
+		maca_phy0: ethernet-phy@0 {
+			reg = <2>;
+		};
+	};
+};
+&udc0 {
+
+	status = "disabled";
+};
+
+&rtc0 {
+	status = "okay";
+};
+
+&watchdog0 {
+	status = "okay";
+};
+
+&i2c0 {
+	status = "okay";
+};
+
+&i2c1 {
+	status = "okay";
+};
+
+&i2c2 {
+	status = "okay";
+};
+
+&i2c3 {
+	status = "okay";
+};
+
+&spi0 {
+	status = "okay";
+};
+
+&spi1 {
+	status = "okay";
+};
+
+&spi2 {
+	status = "okay";
+};
+
+&spi3 {
+	status = "okay";
+};
+
+&can0 {
+	clock-names = "gclk_can";
+	status = "okay";
+};
+
+&can1 {
+	clock-names = "gclk_can";
+	status = "okay";
+};
+
+&can2 {
+	clock-names = "gclk_can";
+	status = "okay";
+};
+
+&uart1 {
+	status = "okay";
+};
+
+&{/apb@ffe4000000/ir@e4001000} {
+	status = "okay";
+};
+
