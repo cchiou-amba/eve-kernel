@@ -336,6 +336,13 @@ config SENSORS_FAM15H_POWER
 	  This driver can also be built as a module. If so, the module
 	  will be called fam15h_power.
 
+config SENSORS_AMBARELLA_TS
+	tristate "AMBARELLA Temperature Sensor"
+	depends on ARCH_AMBARELLA
+	help
+	  If you say yes here you get support for a temperature sensor
+	  that provides temperature reading through sysfs interface
+
 config SENSORS_APPLESMC
 	tristate "Apple SMC (Motion sensor, light sensor, keyboard backlight)"
 	depends on INPUT && X86
