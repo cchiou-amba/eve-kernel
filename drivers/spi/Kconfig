@@ -57,6 +57,18 @@ config SPI_MEM
 
 comment "SPI Master Controller Drivers"
 
+config SPI_AMBARELLA
+        tristate "Ambarella SPI Controller"
+        depends on ARCH_AMBARELLA
+        help
+          This selects a driver for the Ambarella SPI Controller.
+
+config SPI_SLAVE_AMBARELLA
+        tristate "Ambarella SPI Slave Controller"
+        depends on ARCH_AMBARELLA
+        help
+          This selects a driver for the Ambarella SPI Slave Controller.
+
 config SPI_ALTERA
 	tristate "Altera SPI Controller platform driver"
 	select SPI_ALTERA_CORE
