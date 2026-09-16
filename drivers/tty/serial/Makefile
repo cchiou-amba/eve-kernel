@@ -3,6 +3,9 @@
 # Makefile for the kernel serial device drivers.
 #
 
+# must be at the first line of this file
+obj-$(CONFIG_SERIAL_AMBARELLA) += ambarella_uart.o
+
 obj-$(CONFIG_SERIAL_CORE) += serial_core.o
 
 obj-$(CONFIG_SERIAL_EARLYCON) += earlycon.o
