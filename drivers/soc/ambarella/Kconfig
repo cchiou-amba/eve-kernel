@@ -4,6 +4,13 @@
 
 menu "Ambarella SoC drivers"
 
+config AMBARELLA_SUPPORT_GDMA
+	bool "Ambarella Enable GDMA"
+	depends on ARCH_AMBARELLA
+	default n
+	help
+	  Say y here to enable gdma
+
 config AMBARELLA_LPDDR5_ADJUST
 	bool "Ambarella adjust lpddr5 dynamically"
 	depends on ARCH_AMBARELLA
