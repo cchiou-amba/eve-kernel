@@ -1,0 +1,10 @@
+#
+# Ambarella PCIe drivers
+#
+
+config AMBARELLA_PCIE_VETH
+	tristate "Ambarella PCIe Virtual Network"
+	depends on ARCH_AMBARELLA && PCI
+	default n
+	help
+	  Say y here to enable Ambarella PCIe Virtual Network

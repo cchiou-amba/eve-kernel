@@ -1,0 +1,15 @@
+#
+# Ambarella SoC drivers
+#
+
+menu "Ambarella SoC drivers"
+
+config AMBARELLA_LPDDR5_ADJUST
+	bool "Ambarella adjust lpddr5 dynamically"
+	depends on ARCH_AMBARELLA
+	default n
+	help
+	  Say y here to adjust lpddr5 dynamically
+
+source "drivers/soc/ambarella/pcie/Kconfig"
+endmenu
