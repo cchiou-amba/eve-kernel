@@ -74,6 +74,14 @@ config HW_RANDOM_ATMEL
 
 	  If unsure, say Y.
 
+config HW_RANDOM_AMBARELLA
+	tristate "Ambarella HW Random Number Generator support"
+	depends on ARCH_AMBARELLA
+	default HW_RANDOM
+	help
+	  This driver provides kernel-side support for the Random Number
+	  Generator hardware found on Ambarella devices.
+
 config HW_RANDOM_BA431
 	tristate "Silex Insight BA431 Random Number Generator support"
 	depends on HAS_IOMEM
