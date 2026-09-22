@@ -16,6 +16,9 @@ ARG KBUILD_BUILD_TIMESTAMP
 ARG LOCALVERSION
 
 FROM --platform=${BUILDPLATFORM} alpine:${ALPINE_VERSION} as builder-native-base
+# TLS-intercepting proxy support; no-op when unset. See ../tools/misc/ca/README.md.
+ARG EXTRA_CA_CERTS=
+RUN [ -z "$EXTRA_CA_CERTS" ] || printf '%s\n' "$EXTRA_CA_CERTS" >> /etc/ssl/certs/ca-certificates.crt
 RUN apk add make flex bison elfutils-dev openssl-dev findutils diffutils perl ccache gcc libgcc musl-dev \
     automake \
     autoconf \
