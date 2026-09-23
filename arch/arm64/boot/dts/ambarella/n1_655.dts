@@ -79,18 +79,24 @@
 			phandle = <0x70>;
 		};
 
-		iav@0 {
+		disp@0 {
 			compatible = "shared-dma-pool";
 			no-map;
-			reg = <0x00 0xa3000000 0x00 0x5d000000>;
-			phandle = <0x5f>;
+			reg = <0x00 0x7e000000 0x00 0x2000000>;
 		};
 
 		iav@1 {
 			compatible = "shared-dma-pool";
 			no-map;
-			reg = <0x00 0x28000000 0x00 0x18000000>;
+			reg = <0x00 0x80000000 0x00 0x18000000>;
 			phandle = <0x60>;
+		};
+
+		iav@0 {
+			compatible = "shared-dma-pool";
+			no-map;
+			reg = <0x00 0x98000000 0x00 0x68000000>;
+			phandle = <0x5f>;
 		};
 
 		linux,cma {
