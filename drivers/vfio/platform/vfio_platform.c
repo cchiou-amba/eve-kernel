@@ -64,7 +64,10 @@ static int vfio_platform_probe(struct platform_device *pdev)
 	if (IS_ERR(vdev))
 		return PTR_ERR(vdev);
 
-	ret = vfio_register_group_dev(&vdev->vdev);
+	if (pdev->dev.iommu_group)
+		ret = vfio_register_group_dev(&vdev->vdev);
+	else
+		ret = vfio_register_emulated_iommu_dev(&vdev->vdev);
 	if (ret)
 		goto out_put_vdev;
 

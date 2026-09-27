@@ -110,6 +110,12 @@
 			reg = <0x00 0x2000000 0x00 0x200000>;
 			no-map;
 		};
+
+		dma32_reserved: dma32_reserved@6c000000 {
+			compatible = "ambarella,dma32-pool";
+			no-map;
+			reg = <0x00 0x6c000000 0x00 0x04000000>;
+		};
 	};
 
 	firmware {
@@ -1739,7 +1745,7 @@
 			amb,rxdma-used;
 			dmas = <0x4d 0x0d 0x4d 0x0e>;
 			dma-names = "tx\0rx";
-			status = "disabled";
+			status = "okay";
 		};
 
 		uart@e0019000 {
@@ -1754,7 +1760,7 @@
 			amb,rxdma-used;
 			dmas = <0x4d 0x0f 0x4d 0x10>;
 			dma-names = "tx\0rx";
-			status = "disabled";
+			status = "okay";
 		};
 
 		uart@e001a000 {
