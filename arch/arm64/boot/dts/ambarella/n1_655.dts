@@ -46,11 +46,11 @@
 
 	memory {
 		device_type = "memory";
-		reg = <0x00 0x00 0x01 0x00>;
+		reg = <0x00 0x00 0x08 0x00>;
 		#address-cells = <0x02>;
 		#size-cells = <0x02>;
 		ranges;
-		total_size = <0x01 0x00>;
+		total_size = <0x08 0x00>;
 	};
 
 	reserved-memory {
@@ -60,14 +60,13 @@
 
 		cavalry@2 {
 			no-map;
-			reg = <0x00 0x25c00000 0x00 0x400000>;
+			reg = <0x00 0x1fc00000 0x00 0x400000>;
 			compatible = "shared-dma-pool";
 			phandle = <0x71>;
 		};
 
 		cavalry@1 {
 			no-map;
-			reg = <0x00 0x26000000 0x00 0x2000000>;
 			compatible = "shared-dma-pool";
 			phandle = <0x72>;
 		};
@@ -82,20 +81,20 @@
 		disp@0 {
 			compatible = "shared-dma-pool";
 			no-map;
-			reg = <0x00 0x7e000000 0x00 0x2000000>;
+			reg = <0x00 0x20000000 0x00 0x8000000>;
 		};
 
 		iav@1 {
 			compatible = "shared-dma-pool";
 			no-map;
-			reg = <0x00 0x80000000 0x00 0x18000000>;
+			reg = <0x00 0x28000000 0x00 0x18000000>;
 			phandle = <0x60>;
 		};
 
 		iav@0 {
 			compatible = "shared-dma-pool";
 			no-map;
-			reg = <0x00 0x98000000 0x00 0x68000000>;
+			reg = <0x00 0x40000000 0x00 0xc0000000>;
 			phandle = <0x5f>;
 		};
 
@@ -111,11 +110,6 @@
 			no-map;
 		};
 
-		dma32_reserved: dma32_reserved@6c000000 {
-			compatible = "ambarella,dma32-pool";
-			no-map;
-			reg = <0x00 0x6c000000 0x00 0x04000000>;
-		};
 	};
 
 	firmware {
@@ -2653,7 +2647,7 @@
 	u-boot_cfg {
 		#address-cells = <0x01>;
 		#size-cells = <0x00>;
-		reloc-top = <0x80000000>;
+		reloc-top = <0x13000000>;
 	};
 
 	sub_scheduler0 {
