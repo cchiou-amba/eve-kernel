@@ -611,10 +611,19 @@ static int vfio_platform_of_probe(struct vfio_platform_device *vdev,
 
 	ret = device_property_read_string(dev, "compatible",
 					  &vdev->compat);
-	if (ret)
-		dev_err(dev, "Cannot retrieve compat for %s\n", vdev->name);
+	if (ret) {
+		/*
+		 * Devices instantiated by driver code (e.g. the xhci-hcd child
+		 * created by cdns3) carry no "compatible" property. Use the
+		 * device name so the device can still be bound.
+		 */
+		dev_info(dev, "No compatible property, using name %s\n",
+			 vdev->name);
+		vdev->compat = vdev->name;
+		return 0;
+	}
 
-	return ret;
+	return 0;
 }
 
 /*

@@ -459,15 +459,9 @@ int cdns_drd_init(struct cdns *cdns)
 		cdns->dr_mode = USB_DR_MODE_PERIPHERAL;
 	}
 
-	ret = devm_request_threaded_irq(cdns->dev, cdns->otg_irq,
-					cdns_drd_irq,
-					cdns_drd_thread_irq,
-					IRQF_SHARED,
-					dev_name(cdns->dev), cdns);
-	if (ret) {
-		dev_err(cdns->dev, "couldn't get otg_irq\n");
+	ret = cdns_drd_claim_otg_irq(cdns);
+	if (ret)
 		return ret;
-	}
 
 	state = readl(&cdns->otg_regs->sts);
 	if (OTGSTS_OTG_NRDY(state)) {
@@ -478,9 +472,40 @@ int cdns_drd_init(struct cdns *cdns)
 	return 0;
 }
 
+int cdns_drd_claim_otg_irq(struct cdns *cdns)
+{
+	int ret;
+
+	if (cdns->otg_irq_claimed)
+		return 0;
+
+	ret = devm_request_threaded_irq(cdns->dev, cdns->otg_irq,
+					cdns_drd_irq,
+					cdns_drd_thread_irq,
+					IRQF_SHARED,
+					dev_name(cdns->dev), cdns);
+	if (ret) {
+		dev_err(cdns->dev, "couldn't get otg_irq\n");
+		return ret;
+	}
+
+	cdns->otg_irq_claimed = true;
+	return 0;
+}
+
+void cdns_drd_release_otg_irq(struct cdns *cdns)
+{
+	if (!cdns->otg_irq_claimed)
+		return;
+
+	devm_free_irq(cdns->dev, cdns->otg_irq, cdns);
+	cdns->otg_irq_claimed = false;
+}
+
 int cdns_drd_exit(struct cdns *cdns)
 {
 	cdns_otg_disable_irq(cdns);
+	cdns_drd_release_otg_irq(cdns);
 
 	return 0;
 }

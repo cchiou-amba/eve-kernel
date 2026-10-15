@@ -11,6 +11,7 @@
 #ifndef __LINUX_CDNS3_CORE_H
 #define __LINUX_CDNS3_CORE_H
 
+#include <linux/notifier.h>
 #include <linux/usb/otg.h>
 #include <linux/usb/role.h>
 
@@ -101,6 +102,9 @@ struct cdns {
 	int				otg_irq;
 	int				dev_irq;
 	int				wakeup_irq;
+	bool				otg_irq_claimed;
+	bool				otg_nb_registered;
+	struct notifier_block		otg_irq_nb;
 	struct cdns_role_driver	*roles[USB_ROLE_DEVICE + 1];
 	enum usb_role			role;
 	struct platform_device		*host_dev;

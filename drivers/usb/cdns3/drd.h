@@ -214,6 +214,8 @@ void cdns_clear_vbus(struct cdns *cdns);
 void cdns_set_vbus(struct cdns *cdns);
 int cdns_drd_init(struct cdns *cdns);
 int cdns_drd_exit(struct cdns *cdns);
+int cdns_drd_claim_otg_irq(struct cdns *cdns);
+void cdns_drd_release_otg_irq(struct cdns *cdns);
 int cdns_drd_update_mode(struct cdns *cdns);
 int cdns_drd_gadget_on(struct cdns *cdns);
 void cdns_drd_gadget_off(struct cdns *cdns);

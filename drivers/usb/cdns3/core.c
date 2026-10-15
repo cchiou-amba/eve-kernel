@@ -18,12 +18,43 @@
 #include <linux/interrupt.h>
 #include <linux/io.h>
 #include <linux/pm_runtime.h>
+#include <linux/string.h>
 
 #include "core.h"
 #include "host-export.h"
 #include "drd.h"
 
 static int cdns_idle_init(struct cdns *cdns);
+
+/*
+ * The n1_655 DT lists host, peripheral, and otg as the same GIC SPI.
+ * vfio-platform claims that line without IRQF_SHARED. Drop the DRD
+ * handler before the xHCI child leaves xhci-hcd, and take it back
+ * only when xhci-hcd is bound again.
+ */
+static int cdns_xhci_irq_notifier(struct notifier_block *nb,
+				  unsigned long action, void *data)
+{
+	struct cdns *cdns = container_of(nb, struct cdns, otg_irq_nb);
+	struct device *dev = data;
+
+	if (!cdns->host_dev || dev != &cdns->host_dev->dev)
+		return NOTIFY_DONE;
+
+	switch (action) {
+	case BUS_NOTIFY_UNBIND_DRIVER:
+		cdns_drd_release_otg_irq(cdns);
+		break;
+	case BUS_NOTIFY_BOUND_DRIVER:
+		if (dev->driver && !strcmp(dev->driver->name, "xhci-hcd"))
+			cdns_drd_claim_otg_irq(cdns);
+		break;
+	default:
+		break;
+	}
+
+	return NOTIFY_OK;
+}
 
 static int cdns_role_start(struct cdns *cdns, enum usb_role role)
 {
@@ -474,6 +505,14 @@ int cdns_init(struct cdns *cdns)
 
 	spin_lock_init(&cdns->lock);
 
+	cdns->otg_irq_nb.notifier_call = cdns_xhci_irq_notifier;
+	ret = bus_register_notifier(&platform_bus_type, &cdns->otg_irq_nb);
+	if (ret) {
+		dev_err(dev, "failed to register xhci irq notifier: %d\n", ret);
+		goto init_failed;
+	}
+	cdns->otg_nb_registered = true;
+
 	dev_dbg(dev, "Cadence USB3 core: probe succeed\n");
 
 	return 0;
@@ -495,6 +534,10 @@ EXPORT_SYMBOL_GPL(cdns_init);
  */
 int cdns_remove(struct cdns *cdns)
 {
+	if (cdns->otg_nb_registered)
+		bus_unregister_notifier(&platform_bus_type, &cdns->otg_irq_nb);
+	cdns->otg_nb_registered = false;
+
 	cdns_exit_roles(cdns);
 	usb_role_switch_unregister(cdns->role_sw);
 

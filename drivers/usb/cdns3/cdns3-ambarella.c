@@ -286,7 +286,13 @@ static int cdns_ambarella_probe(struct platform_device *pdev)
 
 	cdns_ambarella_pdata->platform_suspend =
 		cdns_ambarella_platform_suspend;
-	cdns_ambarella_pdata->quirks = CDNS3_DEFAULT_PM_RUNTIME_ALLOW;
+	/*
+	 * Do not set CDNS3_DEFAULT_PM_RUNTIME_ALLOW: cdns3-plat then keeps
+	 * the DRD core runtime-PM forbidden ("on"), so the Torrent PHY and
+	 * OTG host strap stay powered when xhci-hcd.0.auto is unbound from
+	 * xhci-plat and handed to vfio-platform for guest passthrough.
+	 */
+	cdns_ambarella_pdata->quirks = 0;
 	cdns_ambarella_auxdata[0].platform_data = cdns_ambarella_pdata;
 
 	ret = of_platform_populate(node, NULL, cdns_ambarella_auxdata, dev);

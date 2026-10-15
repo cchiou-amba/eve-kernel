@@ -110,6 +110,11 @@
 			no-map;
 		};
 
+		virt_usb_dma_reserved: virt_usb_dma@15c00000 {
+			reg = <0x0 0x15c00000 0x0 0x02000000>;
+			no-map;
+		};
+
 		dma32_reserved: dma32@17c00000 {
 			compatible = "ambarella,dma32-pool";
 			reg = <0x0 0x17c00000 0x0 0x04000000>;
