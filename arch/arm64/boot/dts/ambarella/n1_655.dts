@@ -110,6 +110,12 @@
 			no-map;
 		};
 
+		dma32_reserved: dma32@17c00000 {
+			compatible = "ambarella,dma32-pool";
+			reg = <0x0 0x17c00000 0x0 0x04000000>;
+			no-map;
+		};
+
 	};
 
 	firmware {
